@@ -1,19 +1,24 @@
-name: Publish to PyPI
+name: Publish
 
-# Publishes to PyPI when you cut a GitHub Release. Uses Trusted Publishing
-# (OIDC) — no API tokens or secrets are stored in the repo.
+# Uses Trusted Publishing (OIDC) — no API tokens or secrets are stored in the repo.
 #
-# One-time setup on PyPI (https://pypi.org/manage/account/publishing/):
-#   Project name:     concept-mapmaker
-#   Owner:            JLichwa80
-#   Repository name:  concept-mapmaker
-#   Workflow name:    publish.yml
-#   Environment name: pypi
-# Then create a matching GitHub Environment named "pypi" in repo settings.
+#   * Run manually (Actions tab -> "Publish" -> "Run workflow")  -> TestPyPI dry run
+#   * Publish a GitHub Release                                    -> real PyPI
+#
+# One-time setup — add a "pending publisher" for EACH index, plus a matching
+# GitHub Environment (repo Settings -> Environments) of the same name:
+#
+#   PyPI     https://pypi.org/manage/account/publishing/       environment: pypi
+#   TestPyPI https://test.pypi.org/manage/account/publishing/  environment: testpypi
+#
+# For both, the publisher fields are:
+#   Owner: JLichwa80   Repository: concept-mapmaker
+#   Workflow name: publish.yml
 
 on:
   release:
     types: [published]
+  workflow_dispatch: {}   # manual TestPyPI dry run
 
 jobs:
   build:
@@ -37,9 +42,28 @@ jobs:
           name: dist
           path: dist/
 
-  publish:
+  testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write        # required for Trusted Publishing (OIDC)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true   # re-runs of the same version won't fail
+
+  pypi:
     name: Publish to PyPI
     needs: build
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
