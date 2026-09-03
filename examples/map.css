@@ -1,0 +1,11 @@
+/* Optional. Placed beside demo.md (or in the project root), this file is appended after the
+   generated branch colors, so its rules win. Uncomment and edit to customize. */
+
+/* Recolor a palette slot — branches take slots in legend order (--pal-1 = Beans here): */
+/* :root { --pal-1: #b5179e; } */
+
+/* Recolor one branch by its legend key: */
+/* :root { --branch-brewing: #0e7c86; } */
+
+/* Restyle the pills themselves: */
+/* .markmap-foreign span.pill { border-radius: 6px; } */

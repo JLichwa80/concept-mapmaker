@@ -1,0 +1,11 @@
+/* Optional. Placed beside your doc (or in the project root), this file is appended after the
+   generated branch colors, so its rules win. Uncomment and edit freely. */
+
+/* Recolor a palette slot — branches take slots in legend order (--pal-1 = the first legend entry): */
+/* :root { --pal-1: #b5179e; } */
+
+/* Recolor one branch by its legend key: */
+/* :root { --branch-first: #0e7c86; } */
+
+/* Restyle the pills themselves: */
+/* .markmap-foreign span.pill { border-radius: 6px; } */

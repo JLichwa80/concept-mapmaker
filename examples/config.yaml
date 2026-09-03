@@ -1,0 +1,14 @@
+# All fields optional. Build with:
+#   concept-map build examples/demo.md --spec examples/config.yaml
+
+title: Coffee Map            # header brand, browser tab, panel eyebrow. Default: "Map"
+subtitle: A Tiny Example Map # line under the title. Default: none
+# page_title: Coffee Map     # browser tab title. Default: title
+
+# legend: branch types that color the map and fill the header legend. First matching regex sets
+#   a node's branch (subtree inherits). Colored from the template palette in order; override with
+#   a project map.css. Default: no legend, single neutral color.
+legend:
+  - {match: '^1\.', key: beans,   label: Beans}
+  - {match: '^2\.', key: brewing, label: Brewing}
+  - {match: '^3\.', key: drinks,  label: Drinks}

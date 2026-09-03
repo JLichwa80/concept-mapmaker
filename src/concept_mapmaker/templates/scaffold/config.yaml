@@ -1,0 +1,12 @@
+# All fields optional. Build with:
+#   concept-map build map.md
+
+title: My Map                    # header brand, browser tab, panel eyebrow. Default: "Map"
+subtitle: Built with concept-map # line under the title. Default: none
+
+# legend: branch types that color the map and fill the header legend. First matching regex sets
+#   a node's branch (subtree inherits). Colored from the template palette in order; override with
+#   a map.css. Default: no legend, single neutral color.
+legend:
+  - {match: '^1\.', key: first,  label: First Branch}
+  - {match: '^2\.', key: second, label: Second Branch}
