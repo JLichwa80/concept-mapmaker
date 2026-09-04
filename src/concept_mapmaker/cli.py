@@ -18,6 +18,7 @@ def main(argv=None):
     build.add_argument("--spec", help="YAML presentation spec "
                                       "(defaults to config.yaml beside the doc)")
     build.add_argument("--output", help="output HTML path (default: web/<stem>.html)")
+    build.add_argument("--template", help="custom node-display HTML template (default: bundled)")
 
     serve = commands.add_parser("serve", help="preview generated maps locally")
     serve.add_argument("map", nargs="?", help="HTML map path or filename under web/")
@@ -29,7 +30,8 @@ def main(argv=None):
 
     args = parser.parse_args(argv)
     if args.command == "build":
-        return builder.run_build(args.input, spec=args.spec, output=args.output)
+        return builder.run_build(args.input, spec=args.spec, output=args.output,
+                                 template=args.template)
     if args.command == "init":
         return builder.run_init(args.dir)
     return server.serve(args.map, port=args.port, no_browser=args.no_browser)

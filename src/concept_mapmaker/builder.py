@@ -9,15 +9,19 @@ self-contained interactive HTML map. You pass the source doc; everything else is
   * spec (YAML)     — per-map presentation (title, subtitle, legend branch types).
                       Auto-found at `config.yaml` beside the doc, or named with `--spec`.
 
-The display template is fixed (`templates/default.html`) and holds the default color palette;
-the spec's `legend` are ordered `{match, key, label}` rules that a node takes by the first rule
-whose regex matches its label (else it inherits its parent / stays structural), and each legend
-key is bound to a palette slot at build time. A project `map.css` can override the colors.
+The display template defaults to the bundled `templates/default.html`, which holds the default
+color palette; the spec's `legend` are ordered `{match, key, label}` rules that a node takes by
+the first rule whose regex matches its label (else it inherits its parent / stays structural), and
+each legend key is bound to a palette slot at build time. A project `map.css` can override the
+colors. The node-display template is an extension point: pass a custom one via `--template` (or
+`load_template(path)` / `build_map(..., template=…)`), supply any extra `__KEY__` values it needs
+via `extra_context`, and style with CSS — the engine stays presentation-agnostic.
 
 Usage after installation:
     concept-map build demo.md                          # -> web/demo.html
     concept-map build demo.md --output web/x.html
     concept-map build demo.md --spec config.yaml
+    concept-map build demo.md --template custom.html   # custom node-display layout
 """
 import re
 import json
@@ -312,13 +316,21 @@ def build_link_maps(root):
 
 # --- Templating -------------------------------------------------------------------------
 
-def load_template():
-    """Return the package's bundled `templates/default.html` display template.
+def load_template(name_or_path=None):
+    """Return the text of a display (node-display) template.
 
-    The template is fixed (not selectable from the spec or CLI): the map's look is the tool's
-    look. To restyle, edit `default.html` directly."""
-    template = resources.files("concept_mapmaker").joinpath("templates/default.html")
-    return template.read_text(encoding="utf-8")
+    `name_or_path` None → the bundled `templates/default.html` (the tool's default look, still the
+    default for every map). Pass a path to plug in a **custom** node-display template — the map's
+    look is then yours. Extensibility is layout-only: pass any extra `__KEY__` values your template
+    needs via `build`/`build_map`'s `extra_context`, and style with a project `map.css` or the
+    template's own CSS. The engine itself stays presentation-agnostic."""
+    if name_or_path is None:
+        template = resources.files("concept_mapmaker").joinpath("templates/default.html")
+        return template.read_text(encoding="utf-8")
+    p = Path(name_or_path)
+    if p.is_file():
+        return p.read_text(encoding="utf-8")
+    raise SystemExit(f"Template not found: {name_or_path}")
 
 
 def render_template(template, context):
@@ -451,12 +463,18 @@ def load_map_css(input_file, project_root):
     return "\n".join(p for p in parts if p)
 
 
-def build_map(input_file, spec, *, output=None, project_root=None):
+def build_map(input_file, spec, *, output=None, project_root=None,
+              template=None, parse_fn=parse, extra_context=None):
     """Build one map from a passed `input_file` (Path) and a presentation `spec` dict.
 
     Output defaults to `<project_root>/web/<input-stem>.html`; pass `output` to override.
     Generated Markdown and PDF downloads live beside it in `downloads/`. All writable paths
     belong to the caller's project, never the installed Python package.
+
+    Extension seams (for consumers embedding the engine): `template` overrides the bundled
+    node-display template (a path, resolved by `load_template`), `parse_fn` swaps in a different
+    input parser, and `extra_context` supplies/overrides `__KEY__` values the custom template
+    consumes. All optional — defaults reproduce the standard build exactly.
     """
     project_root = Path(project_root or Path.cwd()).resolve()
     input_file = Path(input_file).resolve()
@@ -470,9 +488,11 @@ def build_map(input_file, spec, *, output=None, project_root=None):
     slugs = build(
         input_file,
         out,
-        load_template(),
+        load_template(template),
         spec,
         f"downloads/{dl_pdf.name}",
+        parse_fn=parse_fn,
+        extra_context=extra_context,
         map_css=load_map_css(input_file, project_root),
     )
 
@@ -483,11 +503,12 @@ def build_map(input_file, spec, *, output=None, project_root=None):
     return slugs
 
 
-def run_build(input_arg, *, spec=None, output=None, project_root=None):
+def run_build(input_arg, *, spec=None, output=None, project_root=None, template=None):
     """Build one map from a CLI-style request: resolve the input and its spec, then build.
 
     `spec` is an explicit spec path, or None to auto-discover `config.yaml` beside the doc.
-    `output` overrides the default `web/<input-stem>.html`. Called by the `concept-map` CLI.
+    `output` overrides the default `web/<input-stem>.html`. `template` overrides the bundled
+    node-display template with a custom one (a path). Called by the `concept-map` CLI.
     """
     project_root = Path(project_root or Path.cwd()).resolve()
     input_file = resolve_input(input_arg, project_root)
@@ -499,6 +520,7 @@ def run_build(input_arg, *, spec=None, output=None, project_root=None):
         load_spec(spec_ref),
         output=output,
         project_root=project_root,
+        template=template,
     )
 
 
