@@ -1,7 +1,7 @@
 """Generic builder for the interactive concept maps.
 
 Renders a markdown doc (headings for structure, `- **Name**: desc` bullets for concepts, a
-paragraph under a heading as its description, and a `-*-` token to star a node) into a
+paragraph (or `>` Markdown block) under a heading as its description, and a `-*-` token to star a node) into a
 self-contained interactive HTML map. You pass the source doc; everything else is optional:
 
   * input markdown  — the source doc, passed as the positional argument
@@ -31,11 +31,11 @@ from importlib import resources
 from pathlib import Path
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
-BULLET_RE = re.compile(r"^(\s*)-\s+(.*)$")
+BULLET_RE = re.compile(r"^(\s*)[-*+]\s+(.*)$")
 NAME_RE = re.compile(r"^\*\*(.+?)\*\*:?\s*(.*)$")
-LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 # An `<a id>` anchor authored on its own line as an explicit link target; the parser skips it
 # so it never becomes a node.
+QUOTE_RE = re.compile(r"^>\s?(.*)$")
 ANCHOR_ONLY_RE = re.compile(r'^<a id="[^"]*">\s*</a>$')
 
 # A template placeholder is an ALL-CAPS token wrapped in double underscores, e.g. __DATA__.
@@ -55,14 +55,6 @@ def md_unescape(text: str) -> str:
     return MD_ESCAPE_RE.sub(r"\1", text)
 
 
-def render_inline(text: str) -> str:
-    """Minimal markdown -> HTML for description text: escape, then `code` + **bold**."""
-    out = html.escape(text)
-    out = re.sub(r"`([^`]+)`", r"<code>\1</code>", out)
-    out = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", out)
-    return md_unescape(out)
-
-
 # The spec is a fixed-name `config.yaml` (or `.yml`) — one per project folder.
 SPEC_EXTS = ("yaml", "yml")
 
@@ -78,19 +70,6 @@ def find_spec(input_file, project_root):
             if cand.is_file():
                 return cand
     return None
-
-
-def render_field_text(text: str) -> str:
-    """Like render_inline, plus `[text](url)` links in a description. External (http) links
-    open in a new tab; relative links pass through unchanged."""
-    out = render_inline(text)
-
-    def _link(m):
-        label, url = m.group(1), m.group(2)
-        ext = ' target="_blank" rel="noopener"' if url.startswith("http") else ''
-        return f'<a href="{url}"{ext}>{label}</a>'
-
-    return LINK_RE.sub(_link, out)
 
 
 # --- Download doc -----------------------------------------------------------------------
@@ -144,6 +123,7 @@ def parse(md: str):
     stack = [(-1, root)]  # (depth, node); root at -1 so top headings attach to it
     heading_depth = -1
     last_node = None
+    prev_quote = False
 
     def new_node(depth, label, desc):
         counter[0] += 1
@@ -173,6 +153,7 @@ def parse(md: str):
                 last_node = new_node(depth, title, "")
             if marked:
                 last_node["mark"] = True
+            prev_quote = False
             continue
 
         b = BULLET_RE.match(line)
@@ -182,9 +163,10 @@ def parse(md: str):
             depth = heading_depth + 1 + indent // 2
             m = NAME_RE.match(inner)
             label, desc = (m.group(1).strip(), m.group(2).strip()) if m else (inner, "")
-            last_node = new_node(depth, label, render_field_text(desc))
+            last_node = new_node(depth, label, desc)
             if marked:
                 last_node["mark"] = True
+            prev_quote = False
             continue
 
         stripped = line.strip()
@@ -193,14 +175,21 @@ def parse(md: str):
         if ANCHOR_ONLY_RE.match(stripped):
             continue
 
-        # Plain paragraph -> the current node's description.
         if last_node is not None:
             nid = last_node["id"]
-            descriptions[nid] = (
-                descriptions.get(nid, "") + " " + render_field_text(stripped)
-            ).strip()
+            q = QUOTE_RE.match(stripped)
+            if q:
+                # A `>` block is the node's Markdown description (headings, lists, tables...).
+                sep = "" if prev_quote or not descriptions.get(nid) else "\n\n"
+                descriptions[nid] = descriptions.get(nid, "") + sep + q.group(1) + "\n"
+                prev_quote = True
+                continue
+            # Plain paragraph -> the current node's description.
+            sep = "\n\n" if prev_quote else " "
+            descriptions[nid] = (descriptions.get(nid, "").rstrip("\n") + sep + stripped).strip()
+        prev_quote = False
 
-    return root, descriptions
+    return root, {i: d.strip() for i, d in descriptions.items()}
 
 
 # --- Branch assignment (data-driven) ----------------------------------------------------
@@ -333,6 +322,12 @@ def load_template(name_or_path=None):
     raise SystemExit(f"Template not found: {name_or_path}")
 
 
+def script_json(value):
+    """JSON for embedding in an inline <script>: `</` is escaped so text such as `</script>`
+    in a label or description can't end the script block early."""
+    return json.dumps(value, ensure_ascii=False).replace("</", "<\\/")
+
+
 def render_template(template, context):
     """Fill `__KEY__` placeholders from `context` (values already stringified) and return
     the result. Warns if any `__UPPER__` placeholder is left unresolved — the usual sign a
@@ -384,16 +379,16 @@ def build_context(root, descriptions, spec, input_file, download_pdf_href, map_c
         "SUBTITLE": html.escape(str(spec.get("subtitle", ""))),
         "HINT": "Click a node to read about it",
         "KICKER": html.escape(kicker),
-        "KICKERJSON": json.dumps(kicker, ensure_ascii=False),
-        "DLNAME": json.dumps(f"{stem}.svg", ensure_ascii=False),
+        "KICKERJSON": script_json(kicker),
+        "DLNAME": script_json(f"{stem}.svg"),
         "DLPDF": html.escape(download_pdf_href, quote=True),
         "BRANCHCSS": branch_css,
-        "DATA": json.dumps(to_markmap(root, branch_of), ensure_ascii=False),
-        "DESC": json.dumps(descriptions, ensure_ascii=False),
-        "META": json.dumps(meta, ensure_ascii=False),
-        "LABELS": json.dumps(labels, ensure_ascii=False),
-        "SLUGS": json.dumps(slugs, ensure_ascii=False),
-        "PALETTE": json.dumps(palette, ensure_ascii=False),
+        "DATA": script_json(to_markmap(root, branch_of)),
+        "DESC": script_json(descriptions),
+        "META": script_json(meta),
+        "LABELS": script_json(labels),
+        "SLUGS": script_json(slugs),
+        "PALETTE": script_json(palette),
     }
     return context, slugs
 

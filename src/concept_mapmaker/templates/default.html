@@ -106,6 +106,11 @@
   #search-box svg{width:17px;height:17px;flex:0 0 auto;fill:none;stroke:#9aa4b6;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   #search-input{flex:1 1 auto;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font-size:13.5px;font-family:inherit}
   #search-input::placeholder{color:var(--muted)}
+  #search-mode{flex:0 0 auto;background:#343b4a;border:1px solid #454d60;border-radius:8px;color:#c3cad8;
+    font:600 11px/1 inherit;font-family:inherit;padding:5px 8px;cursor:pointer}
+  #search-mode:hover{background:#3d4658;color:#fff}
+  .sr-snip{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sr-snip mark{background:transparent;color:#ffd166;font-weight:700}
   #search-clear{flex:0 0 auto;display:none;background:transparent;border:0;color:var(--muted);cursor:pointer;
     font-size:18px;line-height:1;padding:0 2px}
   #search-clear:hover{color:var(--ink)}
@@ -123,7 +128,10 @@
   .sr-branch{font-size:10.5px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sr-empty{padding:12px 14px;font-size:13px;color:var(--muted);font-style:italic}
 
-  /* Panel — fixed-width column on the right, full height */
+  /* Drag handle between map and panel; sets --panel-w (double-click resets to the default). */
+  #resizer{flex:0 0 6px;margin:0 -3px;z-index:6;cursor:col-resize;background:transparent}
+  #resizer:hover,#resizer.drag{background:#6b728655}
+  /* Panel — column on the right, full height; width from --panel-w (map.css or drag) */
   #panel{flex:0 0 var(--panel-w);width:var(--panel-w);height:100%;padding:22px;overflow-y:auto;background:var(--panel-bg);border-left:1px solid var(--line)}
   .card{position:relative;background:var(--card);border:1px solid var(--line);border-left:6px solid var(--ink);border-radius:14px;padding:22px 22px 24px;box-shadow:0 2px 10px rgba(0,0,0,.3)}
   .copy-link{position:absolute;top:16px;right:16px;display:none;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
@@ -135,6 +143,19 @@
   .card h2{font-size:20px;line-height:1.25;margin:0 0 14px;color:var(--ink)}
   .desc{font-size:14.5px;line-height:1.65;color:#c4ccda}
   .desc code{background:#2f3644;color:#c7b8ff;padding:1px 6px;border-radius:5px;font-size:.88em}
+  .desc>:first-child{margin-top:0}
+  .desc>:last-child{margin-bottom:0}
+  .desc p{margin:0 0 12px}
+  .desc h1,.desc h2,.desc h3,.desc h4{color:var(--ink);line-height:1.3;margin:20px 0 8px}
+  .desc h1,.desc h2{font-size:17px}.desc h3{font-size:15.5px}.desc h4{font-size:14.5px}
+  .desc ul,.desc ol{margin:0 0 12px;padding-left:22px}
+  .desc li{margin:3px 0}
+  .desc blockquote{margin:0 0 12px;padding-left:14px;border-left:3px solid var(--line);color:var(--muted)}
+  .desc pre{background:#2f3644;padding:12px;border-radius:8px;overflow-x:auto}
+  .desc pre code{background:none;padding:0}
+  .desc table{border-collapse:collapse;margin:0 0 12px;font-size:13.5px}
+  .desc th,.desc td{border:1px solid var(--line);padding:5px 9px;text-align:left}
+  .desc hr{border:0;border-top:1px solid var(--line);margin:16px 0}
   .empty{color:var(--muted);font-style:italic}
   .desc a{color:#8fa3c4;text-underline-offset:2px}
 
@@ -148,6 +169,7 @@
     .legend{display:none}
     .dl-md{margin-left:auto}
     main{flex-direction:column}
+    #resizer{display:none}
     #panel{flex:0 0 42vh;width:100%;height:42vh;border-left:none;border-top:1px solid var(--line)}
   }
 
@@ -183,6 +205,7 @@ __BRANCHCSS__
         <div id="search-box">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
           <input id="search-input" type="text" placeholder="Search concepts…" autocomplete="off" spellcheck="false" aria-label="Search concepts">
+          <button id="search-mode" title="Search concept names or description text">Concepts</button>
           <button id="search-clear" title="Clear search" aria-label="Clear search">&times;</button>
         </div>
         <div id="search-results" role="listbox"></div>
@@ -190,11 +213,16 @@ __BRANCHCSS__
       <div id="hint">__HINT__</div>
       <svg id="mm"></svg>
     </div>
+    <div id="resizer" title="Drag to resize; double-click to reset"></div>
     <aside id="panel">
       <div class="card" id="card">
         <button class="copy-link" id="copy-link" title="Copy a link to this concept">
           <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
           <span id="copy-link-text">Copy link</span>
+        </button>
+        <button class="copy-link" id="open-win" style="right:128px" title="Open this concept in a new window">
+          <svg viewBox="0 0 24 24"><path d="M14 3h7v7"/><path d="M21 3l-9 9"/><path d="M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>
+          <span>New window</span>
         </button>
         <p class="kicker" id="p-kicker">__KICKER__</p>
         <h2 id="p-title">Select a concept</h2>
@@ -206,6 +234,8 @@ __BRANCHCSS__
 
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/markmap-view@0.18.12/dist/browser/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script>
   const DATA  = __DATA__;
   const DESC  = __DESC__;
@@ -333,6 +363,15 @@ __BRANCHCSS__
   const pDesc = document.getElementById('p-desc');
   const copyBtn = document.getElementById('copy-link');
   const copyTxt = document.getElementById('copy-link-text');
+  const openBtn = document.getElementById('open-win');
+
+  // Descriptions are Markdown; render and sanitize them. External links open in a new tab.
+  DOMPurify.addHook('afterSanitizeAttributes', n => {
+    if (n.tagName === 'A' && /^https?:/i.test(n.getAttribute('href') || '')){
+      n.setAttribute('target', '_blank'); n.setAttribute('rel', 'noopener');
+    }
+  });
+  const renderMd = md => DOMPurify.sanitize(marked.parse(md));
 
   let selected = null;
   let currentId = null;
@@ -348,8 +387,9 @@ __BRANCHCSS__
     pKick.style.color = accent;
     pTitle.textContent = LABELS[id] || '(concept)';
     const d = DESC[id];
-    pDesc.innerHTML = d ? d : '<span class="empty">No description yet for this concept.</span>';
+    pDesc.innerHTML = d ? renderMd(d) : '<span class="empty">No description yet for this concept.</span>';
     copyBtn.classList.add('show');
+    openBtn.classList.add('show');
     resetCopyLabel();
     if (selected) selected.classList.remove('sel');
     // Locate the pill natively: find the node <g> whose datum payload matches, then its pill.
@@ -459,6 +499,46 @@ __BRANCHCSS__
     }).catch(() => { copyTxt.textContent = 'Press Ctrl+C'; });
   });
 
+  // Resizable panel: drag the handle; the chosen width is remembered per page in this browser.
+  const resizer = document.getElementById('resizer');
+  const PANEL_KEY = 'concept-map-panel-w:' + location.pathname;
+  const setPanelW = w => document.documentElement.style.setProperty('--panel-w', w + 'px');
+  try { const w = parseInt(localStorage.getItem(PANEL_KEY), 10); if (w) setPanelW(w); } catch (e) {}
+  resizer.addEventListener('pointerdown', (e) => {
+    resizer.setPointerCapture(e.pointerId);
+    resizer.classList.add('drag');
+  });
+  resizer.addEventListener('pointermove', (e) => {
+    if (!resizer.classList.contains('drag')) return;
+    setPanelW(Math.round(Math.min(window.innerWidth * 0.8, Math.max(280, window.innerWidth - e.clientX))));
+  });
+  resizer.addEventListener('pointerup', () => {
+    resizer.classList.remove('drag');
+    try { localStorage.setItem(PANEL_KEY, parseInt(getComputedStyle(panel).width, 10)); } catch (e) {}
+    mm.fit();   // reframe the tree in the resized map area
+  });
+  resizer.addEventListener('dblclick', () => {
+    document.documentElement.style.removeProperty('--panel-w');
+    mm.fit();
+    try { localStorage.removeItem(PANEL_KEY); } catch (e) {}
+  });
+  const panel = document.getElementById('panel');
+
+  // Open the selected concept's text alone in a new window.
+  openBtn.addEventListener('click', () => {
+    const w = window.open('', '_blank', 'width=900,height=800');
+    if (!w) return;
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    w.document.write('<!doctype html><meta charset="utf-8"><title>' + esc(pTitle.textContent) + '</title>' +
+      '<style>body{margin:0;padding:32px 40px;background:#191c24;color:#c4ccda;font:16px/1.7 system-ui,sans-serif}' +
+      'h1{color:#eef1f7;font-size:26px}.k{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#9aa4b6}' +
+      'code{background:#2f3644;color:#c7b8ff;padding:1px 6px;border-radius:5px}a{color:#8fa3c4}' +
+      'h2,h3,h4{color:#eef1f7}table{border-collapse:collapse}th,td{border:1px solid #333a49;padding:5px 9px}' +
+      'blockquote{margin:0;padding-left:14px;border-left:3px solid #333a49;color:#9aa4b6}</style>' +
+      '<p class="k">' + esc(pKick.textContent) + '</p><h1>' + esc(pTitle.textContent) + '</h1>' + pDesc.innerHTML);
+    w.document.close();
+  });
+
   // --- Search: filter node labels, reveal + deep-link the chosen node ---
   // Index every node once (id, label, lowercased label, branch label for context). Reuses
   // the existing revealAndSelect (unfold ancestors + select + frame) and pushHash (update
@@ -468,7 +548,10 @@ __BRANCHCSS__
     lower: LABELS[id].toLowerCase(),
     branch: (META[id] && META[id].b) || '',
     key: (META[id] && META[id].k) || 'navy',
+    plain: (DESC[id] || '').replace(/[#>*_`|]/g, ' ').replace(/\s+/g, ' ').trim(),
   }));
+  SEARCH_INDEX.forEach(n => { n.plainLower = n.plain.toLowerCase(); });
+  let searchMode = 'concepts';   // 'concepts' (names) or 'content' (description text)
   const SEARCH_MAX = 25;
 
   const searchWrap = document.getElementById('search');
@@ -492,11 +575,29 @@ __BRANCHCSS__
       htmlEscape(label.slice(i, i + q.length)) + '</mark>' + htmlEscape(label.slice(i + q.length));
   }
 
+  // A highlighted excerpt of the description around the first match.
+  function snippet(n, q){
+    const i = n.plainLower.indexOf(q.toLowerCase());
+    const start = Math.max(0, i - 30);
+    const text = (start ? '…' : '') + n.plain.slice(start, start + 90 + q.length);
+    return highlight(text, q);
+  }
+
   function runSearch(q){
     q = q.trim();
     searchWrap.classList.toggle('has-text', q.length > 0);
     if (!q){ closeSearch(); return; }
     const ql = q.toLowerCase();
+    if (searchMode === 'content'){
+      searchMatches = SEARCH_INDEX
+        .filter(n => n.plainLower.includes(ql))
+        .sort((a, b) => a.plainLower.indexOf(ql) - b.plainLower.indexOf(ql))
+        .slice(0, SEARCH_MAX);
+      searchActive = searchMatches.length ? 0 : -1;
+      renderSearch(q);
+      searchWrap.classList.add('open');
+      return;
+    }
     // Rank: label starts with query first, then earliest match position, then shorter label.
     searchMatches = SEARCH_INDEX
       .filter(n => n.lower.includes(ql))
@@ -515,15 +616,17 @@ __BRANCHCSS__
 
   function renderSearch(q){
     if (!searchMatches.length){
-      searchResults.innerHTML = '<div class="sr-empty">No matching concepts</div>';
+      searchResults.innerHTML = '<div class="sr-empty">' +
+        (searchMode === 'content' ? 'No matching descriptions' : 'No matching concepts') + '</div>';
       return;
     }
     searchResults.innerHTML = searchMatches.map((n, i) =>
       `<div class="sr-item${i === searchActive ? ' active' : ''}" role="option" data-id="${n.id}">` +
         `<span class="sr-dot" style="background:${hexOf(n.key)}"></span>` +
         `<span class="sr-text">` +
-          `<span class="sr-label">${highlight(n.label, q)}</span>` +
-          (n.branch ? `<span class="sr-branch">${htmlEscape(n.branch)}</span>` : '') +
+          `<span class="sr-label">${searchMode === 'content' ? htmlEscape(n.label) : highlight(n.label, q)}</span>` +
+          (searchMode === 'content' ? `<span class="sr-snip">${snippet(n, q)}</span>`
+            : (n.branch ? `<span class="sr-branch">${htmlEscape(n.branch)}</span>` : '')) +
         `</span>` +
       `</div>`).join('');
   }
@@ -551,6 +654,14 @@ __BRANCHCSS__
     if (el) el.scrollIntoView({block: 'nearest'});
   }
 
+  const searchModeBtn = document.getElementById('search-mode');
+  searchModeBtn.addEventListener('click', () => {
+    searchMode = searchMode === 'concepts' ? 'content' : 'concepts';
+    searchModeBtn.textContent = searchMode === 'concepts' ? 'Concepts' : 'Content';
+    searchInput.placeholder = searchMode === 'concepts' ? 'Search concepts…' : 'Search descriptions…';
+    runSearch(searchInput.value);
+    searchInput.focus();
+  });
   searchInput.addEventListener('input', () => runSearch(searchInput.value));
   searchInput.addEventListener('focus', () => { if (searchInput.value.trim()) runSearch(searchInput.value); });
   searchInput.addEventListener('keydown', (e) => {

@@ -19,6 +19,43 @@ class BuilderTests(unittest.TestCase):
         self.assertEqual(concept["label"], "Concept")
         self.assertEqual(descriptions[concept["id"]], "Description")
 
+    def test_quote_block_is_markdown_description(self):
+        markdown = """# Demo
+
+## Branch
+
+> ### Detail
+> - item one
+> - item two
+>
+> Second paragraph.
+
+## Next
+"""
+        root, descriptions = parse(markdown)
+        branch = root["children"][0]
+        self.assertEqual(branch["children"], [])
+        self.assertEqual(
+            descriptions[branch["id"]],
+            "### Detail\n- item one\n- item two\n\nSecond paragraph.",
+        )
+        self.assertEqual(root["children"][1]["label"], "Next")
+
+    @patch("concept_mapmaker.builder.render_pdf")
+    def test_script_end_tag_in_description_cannot_break_page(self, render_pdf):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "sample.md"
+            source.write_text("# Sample\n\n## Topic\n\n> Text </script><b>x</b>\n", encoding="utf-8")
+            build_map(source, {}, project_root=root)
+            html = (root / "web" / "sample.html").read_text(encoding="utf-8")
+            self.assertNotIn("</script><b>", html)
+
+    def test_star_and_plus_bullets_become_concepts(self):
+        root, _ = parse("# Demo\n\n## Branch\n\n* **A**: one\n+ **B**: two\n")
+        labels = [c["label"] for c in root["children"][0]["children"]]
+        self.assertEqual(labels, ["A", "B"])
+
     def test_star_token_marks_node(self):
         root, _ = parse("# Demo\n\n## Branch\n\n- **Concept** -*-: Description\n")
         concept = root["children"][0]["children"][0]

@@ -24,6 +24,9 @@ pip install concept-mapmaker
 
 Requires Python 3.10+. PDF generation is included in the default installation.
 
+Generated maps are single HTML files that load D3, Markmap, marked and DOMPurify from the jsDelivr
+CDN when opened, so viewing a map needs an internet connection.
+
 ## Quickstart
 
 Run these from your content project's folder. `init` scaffolds a starter map, `build` renders it,
@@ -68,9 +71,13 @@ template needs.
 ## Markdown authoring contract
 
 - Headings (`#` through `######`) define structure.
-- Bullets written as `- **Name**: description` define concepts.
+- Bullets written as `- **Name**: description` (`-`, `*` or `+`) define concepts.
 - Two spaces of bullet indentation add one level beneath the current heading.
 - A paragraph directly under a heading becomes that heading node's description.
+- A `>` block under a heading or concept is its description written as full Markdown (headings,
+  lists, tables, code); the side panel renders it. Bullets inside the `>` block stay part of the
+  description and don't become concepts.
+- Select a node and use **New window** in the side panel to open its description on its own.
 - A `-*-` token on a heading or concept marks that node with a star.
 
 The map shown above comes straight from these rules. Its source (`examples/demo.md`) begins:
@@ -123,6 +130,14 @@ Each legend entry is a branch type: the first `match` regex that hits a node's l
 branch, and the subtree inherits it. Branches are colored from a built-in palette in order (the
 palette lives in the display template). With no legend, all nodes use one neutral color and the
 legend is hidden.
+
+## Side panel and search
+
+- **Panel width:** drag the handle between the map and the panel to resize it (double-click resets).
+  The width is remembered per page in the browser. To change the default for everyone, set it in
+  `map.css`: `:root { --panel-w: 720px; }`.
+- **Search:** the search box finds concepts by name. The **Concepts / Content** button beside it
+  switches to searching description text, with an excerpt shown for each hit.
 
 ## Custom colors (`map.css`)
 
